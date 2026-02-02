@@ -110,6 +110,10 @@ func (tw *TreeViewWidget) SetModelPaths(paths []string) error {
 		return err
 	}
 	tw.updateLayout()
+	if tw.treeView != nil && tw.model != nil && tw.model.RootCount() > 0 {
+		// フォルダ読み込み直後は全展開して操作負荷を下げる。
+		tw.treeView.ExpandAll()
+	}
 	return nil
 }
 

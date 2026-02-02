@@ -18,6 +18,11 @@ import (
 	"github.com/miu200521358/walk/pkg/walk"
 )
 
+const (
+	// browseRootThisPC はフォルダ選択の起点を「この PC」にするシェルパスを表す。
+	browseRootThisPC = "::{20D04FE0-3AEA-1069-A2D8-08002B30309D}"
+)
+
 // FolderPicker はフォルダ選択ウィジェットを表す。
 type FolderPicker struct {
 	window            *controller.ControlWindow
@@ -189,7 +194,9 @@ func (fp *FolderPicker) handleDropFiles(files []string) {
 func (fp *FolderPicker) showOpenDialog() {
 	fd := new(walk.FileDialog)
 	fd.Title = fp.title
-	fd.InitialDirPath = fp.resolveInitialDir()
+	initial := fp.resolveInitialDir()
+	fd.BrowseRootDirPath = browseRootThisPC
+	fd.BrowseInitialSelectionPath = initial
 	ok, err := fd.ShowBrowseFolder(fp.window)
 	if err != nil {
 		walk.MsgBox(fp.window, fp.t("読み込み失敗"), err.Error(), walk.MsgBoxIconError)

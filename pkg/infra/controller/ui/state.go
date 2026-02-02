@@ -210,11 +210,7 @@ func (s *treeViewerState) updatePlayerStateWithFrame(motionData *motion.VmdMotio
 		maxFrame = motionData.MaxFrame()
 	}
 	s.player.Reset(maxFrame)
-	if motionData.IsVpd() {
-		s.player.SetPlaying(false)
-		return
-	}
-	s.player.SetPlaying(true)
+	s.player.SetPlaying(false)
 }
 
 // controlWindow は関連付けられたウィンドウを取得する。
