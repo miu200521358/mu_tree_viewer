@@ -91,6 +91,17 @@ func (tw *TreeViewWidget) SetEnabledInPlaying(playing bool) {
 	tw.treeView.SetEnabled(true)
 }
 
+// SetEnabled はツリービューの有効状態を設定する。
+func (tw *TreeViewWidget) SetEnabled(enabled bool) {
+	if tw == nil || tw.treeView == nil {
+		return
+	}
+	tw.treeView.SetEnabled(enabled)
+	if !enabled {
+		tw.hideCopyButton()
+	}
+}
+
 // SetModelPaths はルートパス一覧からツリーを再構築する。
 func (tw *TreeViewWidget) SetModelPaths(paths []string) error {
 	if tw == nil {

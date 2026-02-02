@@ -171,6 +171,24 @@ func (s *treeViewerState) handleTreeFileSelected(path string) {
 	if s == nil || path == "" {
 		return
 	}
+	cw := s.controlWindow()
+	playing := false
+	if cw != nil {
+		playing = cw.Playing()
+		// モデル読み込み中は再生時と同じ無効化で操作を抑止する。
+		cw.SetEnabledInPlaying(true)
+	}
+	if s.treeView != nil {
+		s.treeView.SetEnabled(false)
+	}
+	defer func() {
+		if s.treeView != nil {
+			s.treeView.SetEnabled(true)
+		}
+		if cw != nil {
+			cw.SetEnabledInPlaying(playing)
+		}
+	}()
 	if s.usecase == nil {
 		logErrorWithTitle(s.logger, i18n.TranslateOrMark(s.translator, messages.MessageLoadFailed), nil)
 		return
@@ -185,7 +203,6 @@ func (s *treeViewerState) handleTreeFileSelected(path string) {
 		modelData = result.Model
 	}
 	s.modelData = modelData
-	cw := s.controlWindow()
 	if cw != nil {
 		cw.SetModel(treeViewerWindowIndex, treeViewerModelIndex, modelData)
 	}
