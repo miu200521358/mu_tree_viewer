@@ -126,7 +126,8 @@ func (n *TreeNode) sortChildren() {
 // TreeModel はツリービュー表示用のモデルを表す。
 type TreeModel struct {
 	walk.TreeModelBase
-	roots []*TreeNode
+	roots     []*TreeNode
+	rootPaths []string
 }
 
 // NewTreeModel はTreeModelを生成する。
@@ -158,8 +159,13 @@ func (m *TreeModel) SetRoots(paths []string) error {
 	if m == nil {
 		return errors.New("tree model is nil")
 	}
+	if sameStringSlice(paths, m.rootPaths) {
+		// 同一パスの再走査とツリー再描画を抑止する。
+		return nil
+	}
 	roots, err := buildRoots(paths)
 	m.roots = roots
+	m.rootPaths = append([]string{}, paths...)
 	m.PublishItemsReset(nil)
 	return err
 }

@@ -281,6 +281,8 @@ func (fp *FolderPicker) openHistoryDialog() {
 						return
 					}
 					push.SetEnabled(true)
+					// 履歴反映中は入力を無効化して二重操作を防ぐ。
+					dlg.SetEnabled(false)
 					fp.applyPaths([]string{values[idx]}, true)
 					dlg.Accept()
 				},
