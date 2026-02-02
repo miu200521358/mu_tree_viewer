@@ -104,6 +104,16 @@ func (s *treeViewerState) handleFolderPathsChanged(cw *controller.ControlWindow,
 	if s.treeView == nil {
 		return
 	}
+	targetWindow := cw
+	if targetWindow == nil {
+		targetWindow = s.controlWindow()
+	}
+	if targetWindow != nil {
+		// ツリー構築中は再生時と同じ無効化で操作を抑止する。
+		playing := targetWindow.Playing()
+		targetWindow.SetEnabledInPlaying(true)
+		defer targetWindow.SetEnabledInPlaying(playing)
+	}
 	err := s.treeView.SetModelPaths(paths)
 	if err != nil {
 		logErrorWithTitle(s.logger, i18n.TranslateOrMark(s.translator, messages.LogTreeBuildFailure), err)

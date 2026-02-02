@@ -112,9 +112,43 @@ func (tw *TreeViewWidget) SetModelPaths(paths []string) error {
 	tw.updateLayout()
 	if tw.treeView != nil && tw.model != nil && tw.model.RootCount() > 0 {
 		// フォルダ読み込み直後は全展開して操作負荷を下げる。
-		tw.treeView.ExpandAll()
+		tw.expandAllDirNodes()
 	}
 	return nil
+}
+
+// expandAllDirNodes はディレクトリノードのみを全展開する。
+func (tw *TreeViewWidget) expandAllDirNodes() {
+	if tw == nil || tw.treeView == nil || tw.model == nil {
+		return
+	}
+	tw.treeView.SetSuspended(true)
+	defer tw.treeView.SetSuspended(false)
+
+	stack := make([]*TreeNode, 0, 64)
+	for _, root := range tw.model.roots {
+		if root == nil {
+			continue
+		}
+		stack = append(stack, root)
+	}
+
+	for len(stack) > 0 {
+		idx := len(stack) - 1
+		node := stack[idx]
+		stack = stack[:idx]
+		if node == nil || !node.IsDir() || len(node.children) == 0 {
+			continue
+		}
+		_ = tw.treeView.SetExpanded(node, true)
+		for i := len(node.children) - 1; i >= 0; i-- {
+			child := node.children[i]
+			if child == nil || !child.IsDir() || len(child.children) == 0 {
+				continue
+			}
+			stack = append(stack, child)
+		}
+	}
 }
 
 // Widgets はUI構成を返す。
