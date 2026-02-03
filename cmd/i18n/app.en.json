@@ -173,7 +173,7 @@
     },
     {
         "id": "ツリービュー説明",
-        "translation": "Show model files in a tree"
+        "translation": "Recursively scans the selected folders and lists PMX/PMD/X model files in a hierarchy. Click an item to load the model, and hover to show the copy path icon."
     },
     {
         "id": "パスコピー",

@@ -173,7 +173,7 @@
     },
     {
         "id": "ツリービュー説明",
-        "translation": "Show model files in a tree"
+        "translation": "会递归扫描所选文件夹，并以层级树显示 PMX/PMD/X 模型文件。点击项目即可加载模型，鼠标悬停时会显示路径复制图标。"
     },
     {
         "id": "パスコピー",
