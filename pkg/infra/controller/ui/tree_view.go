@@ -26,14 +26,13 @@ type TreeViewWidget struct {
 	stretchFactor  int
 	contextPath    string
 	contextCopy    *walk.Action
-	contextSendTo  *walk.Action
+	lastSelected   string
 	onFileSelected func(string)
 	onCopyPath     func(string)
-	onSendToPath   func(string)
 }
 
 // NewTreeViewWidget はTreeViewWidgetを生成する。
-func NewTreeViewWidget(translator i18n.II18n, logger logging.ILogger, onFileSelected func(string), onCopyPath func(string), onSendToPath func(string)) *TreeViewWidget {
+func NewTreeViewWidget(translator i18n.II18n, logger logging.ILogger, onFileSelected func(string), onCopyPath func(string)) *TreeViewWidget {
 	if logger == nil {
 		logger = logging.DefaultLogger()
 	}
@@ -43,7 +42,6 @@ func NewTreeViewWidget(translator i18n.II18n, logger logging.ILogger, onFileSele
 		model:          NewTreeModel(),
 		onFileSelected: onFileSelected,
 		onCopyPath:     onCopyPath,
-		onSendToPath:   onSendToPath,
 	}
 }
 
@@ -190,14 +188,9 @@ func (tw *TreeViewWidget) Widgets() declarative.Composite {
 								Enabled:     false,
 								OnTriggered: tw.handleContextCopy,
 							},
-							declarative.Action{
-								AssignTo:    &tw.contextSendTo,
-								Text:        i18n.TranslateOrMark(tw.translator, messages.LabelSendTo),
-								Enabled:     false,
-								OnTriggered: tw.handleContextSendTo,
-							},
 						},
 						OnCurrentItemChanged: tw.handleCurrentItemChanged,
+						OnKeyUp:              tw.handleKeyUp,
 						OnMouseDown: func(x, y int, button walk.MouseButton) {
 							tw.handleMouseDown(x, y, button)
 						},
@@ -227,6 +220,7 @@ func (tw *TreeViewWidget) handleCurrentItemChanged() {
 	if !ok || node == nil || node.IsDir() {
 		return
 	}
+	tw.lastSelected = node.Path()
 	if tw.onFileSelected != nil {
 		tw.onFileSelected(node.Path())
 	}
@@ -266,7 +260,6 @@ func (tw *TreeViewWidget) updateContextMenu(path string) {
 	tw.contextPath = path
 	enabled := path != ""
 	tw.setActionEnabled(tw.contextCopy, enabled)
-	tw.setActionEnabled(tw.contextSendTo, enabled)
 }
 
 // setActionEnabled はアクションの有効状態を設定する。
@@ -289,12 +282,133 @@ func (tw *TreeViewWidget) handleContextCopy() {
 	}
 }
 
-// handleContextSendTo はコンテキストメニューの送る処理を行う。
-func (tw *TreeViewWidget) handleContextSendTo() {
-	if tw == nil || tw.contextPath == "" {
+// handleKeyUp はツリービューのキー操作を処理する。
+func (tw *TreeViewWidget) handleKeyUp(key walk.Key) {
+	if tw == nil {
 		return
 	}
-	if tw.onSendToPath != nil {
-		tw.onSendToPath(tw.contextPath)
+	switch key {
+	case walk.KeyDown:
+		tw.moveSelectionByDelta(1)
+	case walk.KeyUp:
+		tw.moveSelectionByDelta(-1)
 	}
+}
+
+// moveSelectionByDelta は上下キーでモデル選択を進める。
+func (tw *TreeViewWidget) moveSelectionByDelta(delta int) {
+	if tw == nil || tw.treeView == nil || tw.model == nil {
+		return
+	}
+	nodes := collectFileNodes(tw.model.roots)
+	if len(nodes) == 0 {
+		return
+	}
+	currentIndex := resolveFileNodeIndex(nodes, tw.lastSelected)
+	if currentIndex < 0 {
+		if current := tw.resolveCurrentFilePath(); current != "" {
+			currentIndex = resolveFileNodeIndex(nodes, current)
+		}
+	}
+	targetIndex := currentIndex + delta
+	if currentIndex < 0 {
+		if delta < 0 {
+			targetIndex = len(nodes) - 1
+		} else {
+			targetIndex = 0
+		}
+	}
+	if targetIndex < 0 {
+		targetIndex = 0
+	}
+	if targetIndex >= len(nodes) {
+		targetIndex = len(nodes) - 1
+	}
+	target := nodes[targetIndex]
+	if target == nil {
+		return
+	}
+	tw.selectFileNode(target)
+}
+
+// resolveCurrentFilePath は現在選択されているファイルパスを返す。
+func (tw *TreeViewWidget) resolveCurrentFilePath() string {
+	if tw == nil || tw.treeView == nil {
+		return ""
+	}
+	item := tw.treeView.CurrentItem()
+	node, ok := item.(*TreeNode)
+	if !ok || node == nil || node.IsDir() {
+		return ""
+	}
+	return node.Path()
+}
+
+// selectFileNode はモデルノードを選択して表示位置を合わせる。
+func (tw *TreeViewWidget) selectFileNode(node *TreeNode) {
+	if tw == nil || tw.treeView == nil || node == nil {
+		return
+	}
+	tw.expandAncestors(node)
+	if err := tw.treeView.SetCurrentItem(node); err != nil && tw.logger != nil {
+		tw.logger.Warn("ツリー選択の更新に失敗しました: %s", err.Error())
+		return
+	}
+	if err := tw.treeView.EnsureVisible(node); err != nil && tw.logger != nil {
+		tw.logger.Warn("ツリー表示の更新に失敗しました: %s", err.Error())
+	}
+}
+
+// expandAncestors は親ノードを展開して表示対象を可視化する。
+func (tw *TreeViewWidget) expandAncestors(node *TreeNode) {
+	if tw == nil || tw.treeView == nil || node == nil {
+		return
+	}
+	current := node.parent
+	for current != nil {
+		_ = tw.treeView.SetExpanded(current, true)
+		current = current.parent
+	}
+}
+
+// collectFileNodes は表示順でファイルノードを収集する。
+func collectFileNodes(roots []*TreeNode) []*TreeNode {
+	if len(roots) == 0 {
+		return nil
+	}
+	nodes := make([]*TreeNode, 0, 128)
+	for _, root := range roots {
+		collectFileNodesRecursive(root, &nodes)
+	}
+	return nodes
+}
+
+// collectFileNodesRecursive はツリーを走査してファイルノードを追加する。
+func collectFileNodesRecursive(node *TreeNode, out *[]*TreeNode) {
+	if node == nil {
+		return
+	}
+	if !node.IsDir() {
+		*out = append(*out, node)
+		return
+	}
+	for _, child := range node.children {
+		collectFileNodesRecursive(child, out)
+	}
+}
+
+// resolveFileNodeIndex は指定パスに一致するノードの位置を返す。
+func resolveFileNodeIndex(nodes []*TreeNode, path string) int {
+	if len(nodes) == 0 || path == "" {
+		return -1
+	}
+	for i, node := range nodes {
+		if node == nil {
+			continue
+		}
+		if sameFilePath(node.Path(), path) {
+			return i
+		}
+	}
+	return -1
 }

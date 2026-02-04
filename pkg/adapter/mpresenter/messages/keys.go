@@ -17,13 +17,10 @@ const (
 	LabelPathCopy       = "パスコピー"
 	LabelPathCopyTip    = "パスコピー説明"
 	LabelCopyFullPath   = "フルパスコピー"
-	LabelSendTo         = "送る"
 	MessageLoadFailed   = "読み込み失敗"
 	LogLoadSuccess      = "読み込み終了しました"
 	LogCopySuccess      = "パスをコピーしました"
 	LogCopyFailure      = "パスコピーに失敗しました"
-	LogSendToSuccess    = "送るを呼び出しました"
-	LogSendToFailure    = "送るに失敗しました"
 	LogTreeBuildFailure = "ツリー構築に失敗しました"
 	LogTreeEmpty        = "対象モデルが見つかりません"
 )
