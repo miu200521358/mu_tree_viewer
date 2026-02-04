@@ -12,6 +12,7 @@ import (
 	"github.com/miu200521358/mlib_go/pkg/shared/base/logging"
 	"github.com/miu200521358/walk/pkg/declarative"
 	"github.com/miu200521358/walk/pkg/walk"
+	"github.com/miu200521358/win"
 
 	"github.com/miu200521358/mu_tree_viewer/pkg/adapter/mpresenter/messages"
 )
@@ -112,9 +113,53 @@ func (tw *TreeViewWidget) Focus() {
 	if tw == nil || tw.treeView == nil {
 		return
 	}
-	if err := tw.treeView.SetFocus(); err != nil && tw.logger != nil {
-		tw.logger.Warn("ツリービューのフォーカス設定に失敗しました: %s", err.Error())
+	if !tw.canRestoreFocus() {
+		return
 	}
+	tw.treeView.Synchronize(func() {
+		if tw == nil || tw.treeView == nil {
+			return
+		}
+		if !tw.canRestoreFocus() {
+			return
+		}
+		if err := tw.treeView.SetFocus(); err != nil && tw.logger != nil {
+			msg := logging.FormatError(err, tw.logger)
+			if msg == "" {
+				tw.logger.Warn("ツリービューのフォーカス設定に失敗しました")
+				return
+			}
+			tw.logger.Warn("ツリービューのフォーカス設定に失敗しました: %s", msg)
+		}
+	})
+}
+
+// canRestoreFocus はフォーカス復帰の可否を判定する。
+func (tw *TreeViewWidget) canRestoreFocus() bool {
+	if tw == nil || tw.treeView == nil {
+		return false
+	}
+	if !tw.treeView.Visible() || !tw.treeView.Enabled() {
+		return false
+	}
+	// フォアグラウンドが他ウィンドウの場合はフォーカス復帰を行わない。
+	targetRoot := win.GetAncestor(tw.treeView.Handle(), win.GA_ROOT)
+	if targetRoot == 0 {
+		return false
+	}
+	foreground := win.GetForegroundWindow()
+	if foreground == 0 || foreground != targetRoot {
+		return false
+	}
+	focused := walk.FocusedWindow()
+	if focused == nil {
+		return false
+	}
+	focusedRoot := win.GetAncestor(focused.Handle(), win.GA_ROOT)
+	if focusedRoot == 0 || targetRoot == 0 {
+		return false
+	}
+	return focusedRoot == targetRoot
 }
 
 // SetModelPaths はルートパス一覧からツリーを再構築する。
@@ -190,7 +235,7 @@ func (tw *TreeViewWidget) scrollToTop() {
 		return
 	}
 	if err := tw.treeView.EnsureVisible(root); err != nil && tw.logger != nil {
-		tw.logger.Warn("ツリー先頭へのスクロールに失敗しました: %s", err.Error())
+		tw.logger.Warn("ツリー先頭へのスクロールに失敗しました: %s", logging.FormatError(err, tw.logger))
 	}
 }
 
@@ -314,7 +359,7 @@ func (tw *TreeViewWidget) setActionEnabled(action *walk.Action, enabled bool) {
 		return
 	}
 	if err := action.SetEnabled(enabled); err != nil && tw.logger != nil {
-		tw.logger.Warn("メニュー状態の更新に失敗しました: %s", err.Error())
+		tw.logger.Warn("メニュー状態の更新に失敗しました: %s", logging.FormatError(err, tw.logger))
 	}
 }
 
@@ -450,11 +495,11 @@ func (tw *TreeViewWidget) selectFileNode(node *TreeNode) {
 	}
 	tw.expandAncestors(node)
 	if err := tw.treeView.SetCurrentItem(node); err != nil && tw.logger != nil {
-		tw.logger.Warn("ツリー選択の更新に失敗しました: %s", err.Error())
+		tw.logger.Warn("ツリー選択の更新に失敗しました: %s", logging.FormatError(err, tw.logger))
 		return
 	}
 	if err := tw.treeView.EnsureVisible(node); err != nil && tw.logger != nil {
-		tw.logger.Warn("ツリー表示の更新に失敗しました: %s", err.Error())
+		tw.logger.Warn("ツリー表示の更新に失敗しました: %s", logging.FormatError(err, tw.logger))
 	}
 }
 

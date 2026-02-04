@@ -1,7 +1,7 @@
 -------------------------------------------------
 -------------------------------------------------
 
-　　MuModelViewer
+　　MuTreeViewer
 
 　　Additional Readme for Beta Version
 

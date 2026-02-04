@@ -1,7 +1,7 @@
 ----------------------------------------------------------------
 ----------------------------------------------------------------
 
-  「PmxTranslator」
+  「MuTreeViewer」
 
     ver1.00.00
 
@@ -21,36 +21,28 @@ Please take a moment to review the following before using it.
 ■  Summary
 ----------------------------------------------------------------
 
-This is a model viewer compatible with PMX models and X files.
-It can be associated with file extensions and launched by double-clicking.
+This tool displays models (PMX/PMD/X) inside folders as a tree and lets you
+open them with a single click.
+You can also copy the full path of a model and export screenshots.
 
 
 ----------------------------------------------------------------
 ■  Distribution Video
 ----------------------------------------------------------------
 
-【MMD】モデルとモーションのビューワーを作ってみた【MuModelViewer / MuMotionViewer ver1.00】
-
-NicoNico Douga:
-https://www.nicovideo.jp/watch/sm44651615
-
-YouTube:
-https://youtu.be/KIV06g32vmo
-
+(TBD)
 
 ----------------------------------------------------------------
 ■  Static Images for Content Tree
 ----------------------------------------------------------------
 
-MuMotionViewer - コンテンツツリー用静画
-https://seiga.nicovideo.jp/seiga/im11561839
-
+(TBD)
 
 ----------------------------------------------------------------
 ■  Included Files
 ----------------------------------------------------------------
 
-- MuModelViewer_x.xx.xx.exe     …  exe file
+- MuTreeViewer_x.xx.xx.exe      …  exe file
 - Readme.txt                    …  Readme
 - content_tree.txt              …  Content tree set.
 - Community Link - miu's Lab    … Invitation link to miu's Lab Discord server.
@@ -60,7 +52,7 @@ https://seiga.nicovideo.jp/seiga/im11561839
 ■  System Requirements
 ----------------------------------------------------------------
 
-- Windows10/11 64bit
+- Windows11 64bit
   - This tool is intended for use in environments where MMD (MikuMikuDance) is supported.
 
 - Other runtimes, etc., are not required.
@@ -69,9 +61,25 @@ https://seiga.nicovideo.jp/seiga/im11561839
 ■  How to use
 ----------------------------------------------------------------
 
-Please associate the exe with the PMX or X file extensions.
-Double-click to launch, and the model will be displayed.
-If you double-click this exe itself to launch it, only a blank window will appear.
+1. Specify folders and list models
+1.1. Launch the exe to open the tree view window.
+1.2. Set the folder that contains models in "Folder Path".
+     (You can specify multiple folders by drag & drop.)
+1.3. PMX/PMD/X models under the selected folders will be expanded in the tree.
+
+2. Display and switch models
+2.1. Click a model in the tree to display it in the viewer.
+2.2. Use the Up/Down keys to move to the previous/next model (across folders).
+2.3. To apply a motion, set a VMD/VPD in "Motion Path".
+     (If not set, the model is shown in the default pose.)
+
+3. Context menu (tree view)
+3.1. "Copy Full Path": copies the full path of the selected model.
+3.2. "Save Screenshot": saves the current viewer display as
+     "{model name without extension}_screenshot_{yyyymmddhhmmss}.png"
+     in the same folder as the model.
+3.3. Right-click a folder and choose "Save Screenshot" to automatically
+     switch through all models under it and save them in order.
 
 
 ----------------------------------------------------------------
@@ -126,13 +134,11 @@ This tool is created using Go, and includes the following libraries:
 ・https://github.com/go-gl/glfw/v3.3/glfw
 ・https://github.com/go-gl/mathgl
 ・https://github.com/nicksnyder/go-i18n/v2
-・https://github.com/petar/GoLLRB
 ・https://github.com/ftrvxmtrx/tga
 
-The source code is available on GitHub (MIT License).
-However, the copyright is not waived.
+The source code is available on GitHub （CC BY-NC 4.0）.
 
-https://github.com/miu200521358/mu_model_viewer
+https://github.com/miu200521358/mu_tree_viewer
 
 The icon is borrowed from Human Pictogram 2.0.
 https://pictogram2.com/
@@ -142,7 +148,7 @@ https://pictogram2.com/
 ■  Credit
 ----------------------------------------------------------------
 
-  Tool Name： MuModelViewer
+  Tool Name： MuTreeViewer
   Author：  miu (miu200521358)
 
   http://www.nicovideo.jp/user/2776342
@@ -153,8 +159,3 @@ https://pictogram2.com/
 ----------------------------------------------------------------
 ■  Revision
 ----------------------------------------------------------------
-
-MuMotionViewer_1.0.0 (2025/02/11)
-- General distribution start.
-
-
