@@ -5,6 +5,8 @@
 package ui
 
 import (
+	"strings"
+
 	"github.com/miu200521358/mlib_go/pkg/infra/controller"
 	"github.com/miu200521358/mlib_go/pkg/shared/base/i18n"
 	"github.com/miu200521358/mlib_go/pkg/shared/base/logging"
@@ -27,6 +29,9 @@ type TreeViewWidget struct {
 	contextPath    string
 	contextCopy    *walk.Action
 	lastSelected   string
+	pendingKey     walk.Key
+	pendingBase    string
+	pendingActive  bool
 	onFileSelected func(string)
 	onCopyPath     func(string)
 }
@@ -190,6 +195,7 @@ func (tw *TreeViewWidget) Widgets() declarative.Composite {
 							},
 						},
 						OnCurrentItemChanged: tw.handleCurrentItemChanged,
+						OnKeyDown:            tw.handleKeyDown,
 						OnKeyUp:              tw.handleKeyUp,
 						OnMouseDown: func(x, y int, button walk.MouseButton) {
 							tw.handleMouseDown(x, y, button)
@@ -282,21 +288,46 @@ func (tw *TreeViewWidget) handleContextCopy() {
 	}
 }
 
+// handleKeyDown はキー操作の起点を記録する。
+func (tw *TreeViewWidget) handleKeyDown(key walk.Key) {
+	if tw == nil {
+		return
+	}
+	switch key {
+	case walk.KeyDown, walk.KeyUp:
+		base := tw.lastSelected
+		if base == "" {
+			base = tw.resolveCurrentFilePath()
+		}
+		tw.pendingKey = key
+		tw.pendingBase = base
+		tw.pendingActive = true
+	}
+}
+
 // handleKeyUp はツリービューのキー操作を処理する。
 func (tw *TreeViewWidget) handleKeyUp(key walk.Key) {
 	if tw == nil {
 		return
 	}
+	base := ""
+	if tw.pendingActive && tw.pendingKey == key {
+		base = tw.pendingBase
+	}
+	tw.pendingKey = 0
+	tw.pendingBase = ""
+	tw.pendingActive = false
+
 	switch key {
 	case walk.KeyDown:
-		tw.moveSelectionByDelta(1)
+		tw.moveSelectionByDelta(1, base)
 	case walk.KeyUp:
-		tw.moveSelectionByDelta(-1)
+		tw.moveSelectionByDelta(-1, base)
 	}
 }
 
 // moveSelectionByDelta は上下キーでモデル選択を進める。
-func (tw *TreeViewWidget) moveSelectionByDelta(delta int) {
+func (tw *TreeViewWidget) moveSelectionByDelta(delta int, basePath string) {
 	if tw == nil || tw.treeView == nil || tw.model == nil {
 		return
 	}
@@ -304,7 +335,11 @@ func (tw *TreeViewWidget) moveSelectionByDelta(delta int) {
 	if len(nodes) == 0 {
 		return
 	}
-	currentIndex := resolveFileNodeIndex(nodes, tw.lastSelected)
+	currentIndex := resolveFileNodeIndex(nodes, basePath)
+	// 基準パスが無い場合は直近選択/現在選択を補助的に使う。
+	if currentIndex < 0 {
+		currentIndex = resolveFileNodeIndex(nodes, tw.lastSelected)
+	}
 	if currentIndex < 0 {
 		if current := tw.resolveCurrentFilePath(); current != "" {
 			currentIndex = resolveFileNodeIndex(nodes, current)
@@ -411,4 +446,12 @@ func resolveFileNodeIndex(nodes []*TreeNode, path string) int {
 		}
 	}
 	return -1
+}
+
+// sameFilePath は大文字小文字を無視してパスが一致するか判定する。
+func sameFilePath(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	return strings.EqualFold(a, b)
 }
