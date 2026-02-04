@@ -5,7 +5,7 @@
     },
     {
         "id": "使い方説明",
-        "translation": "If you associate the tool with .vmd or .vpd extensions, you can launch it by double-clicking the file.\nYou can check missing standard bones and morphs by comparing with a PMX/PMD model."
+        "translation": "Select folders to show PMX/PMD/X models in a tree.\nClick a tree item or use Up/Down to switch the model.\nRight-click for Copy Full Path or Save Screenshot."
     },
     {
         "id": "使い方",
@@ -157,7 +157,7 @@
     },
     {
         "id": "フォルダパス説明",
-        "translation": "Select a target folder"
+        "translation": "Select folders to search for models. Drag & drop supports multiple folders."
     },
     {
         "id": "モーションパス",
@@ -165,7 +165,7 @@
     },
     {
         "id": "モーションパス説明",
-        "translation": "Select a motion file"
+        "translation": "Select a VMD/VPD to apply to the current model. If not set, the model is shown in the default pose."
     },
     {
         "id": "ツリービュー",
@@ -173,7 +173,7 @@
     },
     {
         "id": "ツリービュー説明",
-        "translation": "Recursively scans the selected folders and lists PMX/PMD/X model files in a hierarchy. Click an item to load the model, and hover to show the copy path icon."
+        "translation": "Shows models under the selected folders in a tree. Click or use Up/Down to switch models.\nRight-click for Copy Full Path or Save Screenshot. Right-click a folder to capture screenshots for all models under it."
     },
     {
         "id": "パスコピー",
@@ -181,7 +181,7 @@
     },
     {
         "id": "パスコピー説明",
-        "translation": "Copy the path to clipboard"
+        "translation": "Right-click a tree item and choose Copy Full Path to copy it to the clipboard."
     },
     {
         "id": "フルパスコピー",

@@ -138,6 +138,7 @@ func (tw *TreeViewWidget) SetModelPaths(paths []string) error {
 	if tw.treeView != nil && tw.model != nil && tw.model.RootCount() > 0 {
 		// フォルダ読み込み直後は全展開して操作負荷を下げる。
 		tw.expandAllDirNodes()
+		tw.scrollToTop()
 	}
 	return nil
 }
@@ -173,6 +174,23 @@ func (tw *TreeViewWidget) expandAllDirNodes() {
 			}
 			stack = append(stack, child)
 		}
+	}
+}
+
+// scrollToTop はツリー表示のスクロール位置を先頭へ戻す。
+func (tw *TreeViewWidget) scrollToTop() {
+	if tw == nil || tw.treeView == nil || tw.model == nil {
+		return
+	}
+	if len(tw.model.roots) == 0 {
+		return
+	}
+	root := tw.model.roots[0]
+	if root == nil {
+		return
+	}
+	if err := tw.treeView.EnsureVisible(root); err != nil && tw.logger != nil {
+		tw.logger.Warn("ツリー先頭へのスクロールに失敗しました: %s", err.Error())
 	}
 }
 
