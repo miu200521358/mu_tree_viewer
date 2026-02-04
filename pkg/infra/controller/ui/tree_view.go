@@ -153,7 +153,7 @@ func (tw *TreeViewWidget) canRestoreFocus() bool {
 	}
 	focused := walk.FocusedWindow()
 	if focused == nil {
-		return false
+		return true
 	}
 	focusedRoot := win.GetAncestor(focused.Handle(), win.GA_ROOT)
 	if focusedRoot == 0 || targetRoot == 0 {
