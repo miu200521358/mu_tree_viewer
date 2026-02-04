@@ -5,6 +5,12 @@
 package ui
 
 import (
+	"fmt"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/miu200521358/mlib_go/pkg/adapter/io_common"
 	"github.com/miu200521358/mlib_go/pkg/domain/model"
 	"github.com/miu200521358/mlib_go/pkg/domain/motion"
@@ -20,9 +26,11 @@ import (
 )
 
 const (
-	treeViewerWindowIndex = 0
-	treeViewerModelIndex  = 0
-	folderHistoryKey      = "folder"
+	treeViewerWindowIndex  = 0
+	treeViewerModelIndex   = 0
+	folderHistoryKey       = "folder"
+	screenshotWaitTimeout  = 30 * time.Second
+	screenshotPollInterval = 200 * time.Millisecond
 )
 
 // treeViewerState はmu_tree_viewerの画面状態を保持する。
@@ -43,6 +51,9 @@ type treeViewerState struct {
 	motionPath  string
 	modelData   *model.PmxModel
 	motionData  *motion.VmdMotion
+
+	screenshotMu      sync.Mutex
+	screenshotRunning bool
 }
 
 // newTreeViewerState は画面状態を初期化する。
@@ -171,6 +182,16 @@ func (s *treeViewerState) handleTreeFileSelected(path string) {
 	if s == nil || path == "" {
 		return
 	}
+	if err := s.loadModelInternal(path, true); err != nil {
+		logErrorWithTitle(s.logger, i18n.TranslateOrMark(s.translator, messages.MessageLoadFailed), err)
+	}
+}
+
+// loadModelInternal はモデルを読み込み、共有状態へ反映する。
+func (s *treeViewerState) loadModelInternal(path string, logSuccess bool) error {
+	if s == nil || path == "" {
+		return fmt.Errorf("モデルパスが空です")
+	}
 	cw := s.controlWindow()
 	playing := false
 	if cw != nil {
@@ -190,13 +211,11 @@ func (s *treeViewerState) handleTreeFileSelected(path string) {
 		}
 	}()
 	if s.usecase == nil {
-		logErrorWithTitle(s.logger, i18n.TranslateOrMark(s.translator, messages.MessageLoadFailed), nil)
-		return
+		return fmt.Errorf("モデル読み込み用のユースケースが未設定です")
 	}
 	result, err := s.usecase.LoadModel(nil, path)
 	if err != nil {
-		logErrorWithTitle(s.logger, i18n.TranslateOrMark(s.translator, messages.MessageLoadFailed), err)
-		return
+		return err
 	}
 	modelData := (*model.PmxModel)(nil)
 	if result != nil {
@@ -206,9 +225,10 @@ func (s *treeViewerState) handleTreeFileSelected(path string) {
 	if cw != nil {
 		cw.SetModel(treeViewerWindowIndex, treeViewerModelIndex, modelData)
 	}
-	if modelData != nil {
+	if logSuccess && modelData != nil {
 		logInfoLine(s.logger, i18n.TranslateOrMark(s.translator, messages.LogLoadSuccess))
 	}
+	return nil
 }
 
 // handleCopyPath はパスコピーを処理する。
@@ -221,6 +241,178 @@ func (s *treeViewerState) handleCopyPath(path string) {
 		return
 	}
 	logInfoLine(s.logger, i18n.TranslateOrMark(s.translator, messages.LogCopySuccess))
+}
+
+// handleScreenshotSave はスクリーンショット保存を開始する。
+func (s *treeViewerState) handleScreenshotSave(path string, isDir bool) {
+	if s == nil || path == "" {
+		return
+	}
+	targets := s.collectScreenshotTargets(path, isDir)
+	if len(targets) == 0 {
+		logInfoLine(s.logger, i18n.TranslateOrMark(s.translator, messages.LogTreeEmpty))
+		return
+	}
+	if !s.beginScreenshotSequence(targets) {
+		if s.logger != nil {
+			s.logger.Warn("スクリーンショット処理中のため新しい要求を無視しました")
+		}
+	}
+}
+
+// beginScreenshotSequence はスクリーンショット連続処理を開始する。
+func (s *treeViewerState) beginScreenshotSequence(paths []string) bool {
+	if s == nil || len(paths) == 0 {
+		return false
+	}
+	s.screenshotMu.Lock()
+	if s.screenshotRunning {
+		s.screenshotMu.Unlock()
+		return false
+	}
+	s.screenshotRunning = true
+	s.screenshotMu.Unlock()
+
+	go func() {
+		defer func() {
+			s.screenshotMu.Lock()
+			s.screenshotRunning = false
+			s.screenshotMu.Unlock()
+		}()
+		s.runScreenshotSequence(paths)
+	}()
+	return true
+}
+
+// runScreenshotSequence はスクリーンショットを順に保存する。
+func (s *treeViewerState) runScreenshotSequence(paths []string) {
+	if s == nil {
+		return
+	}
+	cw := s.controlWindow()
+	if cw == nil {
+		return
+	}
+	for _, modelPath := range uniquePaths(paths) {
+		if modelPath == "" {
+			continue
+		}
+		if err := s.executeOnUIThread(func() error {
+			return s.loadModelInternal(modelPath, true)
+		}); err != nil {
+			logErrorWithTitle(s.logger, i18n.TranslateOrMark(s.translator, messages.LogScreenshotFailure), err)
+			continue
+		}
+
+		screenshotPath, err := buildScreenshotPath(modelPath, time.Now())
+		if err != nil {
+			logErrorWithTitle(s.logger, i18n.TranslateOrMark(s.translator, messages.LogScreenshotFailure), err)
+			continue
+		}
+		requestID, reqErr := cw.RequestScreenshot(treeViewerWindowIndex, screenshotPath)
+		if reqErr != nil {
+			logErrorWithTitle(s.logger, i18n.TranslateOrMark(s.translator, messages.LogScreenshotFailure), reqErr)
+			continue
+		}
+		if waitErr := s.waitScreenshotResult(cw, requestID, screenshotWaitTimeout); waitErr != nil {
+			logErrorWithTitle(s.logger, i18n.TranslateOrMark(s.translator, messages.LogScreenshotFailure), waitErr)
+			continue
+		}
+		logInfoLine(s.logger, i18n.TranslateOrMark(s.translator, messages.LogScreenshotSuccess))
+	}
+}
+
+// collectScreenshotTargets はスクリーンショット対象のモデルパス一覧を返す。
+func (s *treeViewerState) collectScreenshotTargets(path string, isDir bool) []string {
+	if s == nil || path == "" {
+		return nil
+	}
+	if !isDir {
+		return []string{path}
+	}
+	if s.treeView != nil {
+		if paths := s.treeView.CollectModelPathsUnder(path); len(paths) > 0 {
+			return paths
+		}
+	}
+	paths, err := collectModelPaths(path)
+	if err != nil && s.logger != nil {
+		s.logger.Warn("スクリーンショット対象の探索に失敗しました: %s", err.Error())
+	}
+	return paths
+}
+
+// executeOnUIThread はUIスレッドで処理を実行して結果を返す。
+func (s *treeViewerState) executeOnUIThread(action func() error) error {
+	if s == nil {
+		return fmt.Errorf("実行対象が未初期化です")
+	}
+	cw := s.controlWindow()
+	if cw == nil {
+		return action()
+	}
+	done := make(chan error, 1)
+	cw.Synchronize(func() {
+		done <- action()
+	})
+	return <-done
+}
+
+// waitScreenshotResult はスクリーンショット完了を待機する。
+func (s *treeViewerState) waitScreenshotResult(cw *controller.ControlWindow, requestID uint64, timeout time.Duration) error {
+	if cw == nil {
+		return fmt.Errorf("スクリーンショット結果の取得に失敗しました")
+	}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if result, ok := cw.FetchScreenshotResult(requestID); ok {
+			if result.ErrMessage != "" {
+				return fmt.Errorf(result.ErrMessage)
+			}
+			return nil
+		}
+		time.Sleep(screenshotPollInterval)
+	}
+	return fmt.Errorf("スクリーンショット保存がタイムアウトしました")
+}
+
+// buildScreenshotPath はスクリーンショット保存先を生成する。
+func buildScreenshotPath(modelPath string, now time.Time) (string, error) {
+	if modelPath == "" {
+		return "", fmt.Errorf("モデルパスが空です")
+	}
+	dir := filepath.Dir(modelPath)
+	base := filepath.Base(modelPath)
+	ext := filepath.Ext(base)
+	name := strings.TrimSuffix(base, ext)
+	if name == "" {
+		return "", fmt.Errorf("モデル名の取得に失敗しました")
+	}
+	stamp := now.Format("20060102150405")
+	fileName := fmt.Sprintf("%s_screenshot_%s.png", name, stamp)
+	return filepath.Join(dir, fileName), nil
+}
+
+// uniquePaths はパス一覧の重複を除去する。
+func uniquePaths(paths []string) []string {
+	if len(paths) == 0 {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(paths))
+	for _, path := range paths {
+		cleaned := strings.TrimSpace(path)
+		if cleaned == "" {
+			continue
+		}
+		key := strings.ToLower(cleaned)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, cleaned)
+	}
+	return out
 }
 
 // updatePlayerStateWithFrame は再生UIを反映する。

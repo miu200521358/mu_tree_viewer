@@ -18,35 +18,39 @@ import (
 
 // TreeViewWidget はツリービュー表示のウィジェットを表す。
 type TreeViewWidget struct {
-	container      *walk.Composite
-	treeView       *walk.TreeView
-	model          *TreeModel
-	translator     i18n.II18n
-	logger         logging.ILogger
-	minSize        declarative.Size
-	maxSize        declarative.Size
-	stretchFactor  int
-	contextPath    string
-	contextCopy    *walk.Action
-	lastSelected   string
-	pendingKey     walk.Key
-	pendingBase    string
-	pendingActive  bool
-	onFileSelected func(string)
-	onCopyPath     func(string)
+	container         *walk.Composite
+	treeView          *walk.TreeView
+	model             *TreeModel
+	translator        i18n.II18n
+	logger            logging.ILogger
+	minSize           declarative.Size
+	maxSize           declarative.Size
+	stretchFactor     int
+	contextPath       string
+	contextCopy       *walk.Action
+	contextScreenshot *walk.Action
+	contextIsDir      bool
+	lastSelected      string
+	pendingKey        walk.Key
+	pendingBase       string
+	pendingActive     bool
+	onFileSelected    func(string)
+	onCopyPath        func(string)
+	onScreenshotSave  func(string, bool)
 }
 
 // NewTreeViewWidget はTreeViewWidgetを生成する。
-func NewTreeViewWidget(translator i18n.II18n, logger logging.ILogger, onFileSelected func(string), onCopyPath func(string)) *TreeViewWidget {
+func NewTreeViewWidget(translator i18n.II18n, logger logging.ILogger, onFileSelected func(string), onCopyPath func(string), onScreenshotSave func(string, bool)) *TreeViewWidget {
 	if logger == nil {
 		logger = logging.DefaultLogger()
 	}
 	return &TreeViewWidget{
-		translator:     translator,
-		logger:         logger,
-		model:          NewTreeModel(),
-		onFileSelected: onFileSelected,
-		onCopyPath:     onCopyPath,
+		translator:       translator,
+		logger:           logger,
+		model:            NewTreeModel(),
+		onFileSelected:   onFileSelected,
+		onCopyPath:       onCopyPath,
+		onScreenshotSave: onScreenshotSave,
 	}
 }
 
@@ -193,6 +197,12 @@ func (tw *TreeViewWidget) Widgets() declarative.Composite {
 								Enabled:     false,
 								OnTriggered: tw.handleContextCopy,
 							},
+							declarative.Action{
+								AssignTo:    &tw.contextScreenshot,
+								Text:        i18n.TranslateOrMark(tw.translator, messages.LabelScreenshotSave),
+								Enabled:     false,
+								OnTriggered: tw.handleContextScreenshotSave,
+							},
 						},
 						OnCurrentItemChanged: tw.handleCurrentItemChanged,
 						OnKeyDown:            tw.handleKeyDown,
@@ -250,22 +260,24 @@ func (tw *TreeViewWidget) prepareContextMenu(x, y int) {
 	}
 	item := tw.treeView.ItemAt(x, y)
 	node, ok := item.(*TreeNode)
-	if !ok || node == nil || node.IsDir() {
-		tw.updateContextMenu("")
+	if !ok || node == nil {
+		tw.updateContextMenu("", false)
 		return
 	}
 	// 右クリック時はモデル読み込みを避けるため選択変更は行わない。
-	tw.updateContextMenu(node.Path())
+	tw.updateContextMenu(node.Path(), node.IsDir())
 }
 
 // updateContextMenu はコンテキストメニューの有効状態を更新する。
-func (tw *TreeViewWidget) updateContextMenu(path string) {
+func (tw *TreeViewWidget) updateContextMenu(path string, isDir bool) {
 	if tw == nil {
 		return
 	}
 	tw.contextPath = path
+	tw.contextIsDir = isDir
 	enabled := path != ""
-	tw.setActionEnabled(tw.contextCopy, enabled)
+	tw.setActionEnabled(tw.contextCopy, enabled && !isDir)
+	tw.setActionEnabled(tw.contextScreenshot, enabled)
 }
 
 // setActionEnabled はアクションの有効状態を設定する。
@@ -286,6 +298,30 @@ func (tw *TreeViewWidget) handleContextCopy() {
 	if tw.onCopyPath != nil {
 		tw.onCopyPath(tw.contextPath)
 	}
+}
+
+// handleContextScreenshotSave はスクリーンショット保存を実行する。
+func (tw *TreeViewWidget) handleContextScreenshotSave() {
+	if tw == nil || tw.contextPath == "" {
+		return
+	}
+	if tw.onScreenshotSave != nil {
+		tw.onScreenshotSave(tw.contextPath, tw.contextIsDir)
+	}
+}
+
+// CollectModelPathsUnder は指定パス配下のモデルパスを収集する。
+func (tw *TreeViewWidget) CollectModelPathsUnder(path string) []string {
+	if tw == nil || tw.model == nil || path == "" {
+		return nil
+	}
+	node := findNodeByPath(tw.model.roots, path)
+	if node == nil {
+		return nil
+	}
+	nodes := make([]*TreeNode, 0, 64)
+	collectFileNodesRecursive(node, &nodes)
+	return extractNodePaths(nodes)
 }
 
 // handleKeyDown はキー操作の起点を記録する。
@@ -430,6 +466,46 @@ func collectFileNodesRecursive(node *TreeNode, out *[]*TreeNode) {
 	for _, child := range node.children {
 		collectFileNodesRecursive(child, out)
 	}
+}
+
+// extractNodePaths はノード一覧からパスを抽出する。
+func extractNodePaths(nodes []*TreeNode) []string {
+	if len(nodes) == 0 {
+		return nil
+	}
+	paths := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		path := node.Path()
+		if path == "" {
+			continue
+		}
+		paths = append(paths, path)
+	}
+	return paths
+}
+
+// findNodeByPath は指定パスに一致するノードを探索する。
+func findNodeByPath(nodes []*TreeNode, path string) *TreeNode {
+	if len(nodes) == 0 || path == "" {
+		return nil
+	}
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		if sameFilePath(node.Path(), path) {
+			return node
+		}
+		if node.IsDir() {
+			if found := findNodeByPath(node.children, path); found != nil {
+				return found
+			}
+		}
+	}
+	return nil
 }
 
 // resolveFileNodeIndex は指定パスに一致するノードの位置を返す。

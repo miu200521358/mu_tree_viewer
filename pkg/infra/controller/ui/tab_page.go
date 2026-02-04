@@ -67,7 +67,7 @@ func NewTabPages(mWidgets *controller.MWidgets, baseServices base.IBaseServices,
 		state.handleMotionPathChanged,
 	)
 
-	state.treeView = NewTreeViewWidget(translator, logger, state.handleTreeFileSelected, state.handleCopyPath)
+	state.treeView = NewTreeViewWidget(translator, logger, state.handleTreeFileSelected, state.handleCopyPath, state.handleScreenshotSave)
 	state.treeView.SetMinSize(declarative.Size{Width: 400, Height: treeViewFixedHeight})
 	state.treeView.SetStretchFactor(1)
 
