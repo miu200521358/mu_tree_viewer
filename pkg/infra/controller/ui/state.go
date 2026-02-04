@@ -205,6 +205,7 @@ func (s *treeViewerState) loadModelInternal(path string, logSuccess bool) error 
 	defer func() {
 		if s.treeView != nil {
 			s.treeView.SetEnabled(true)
+			s.treeView.Focus()
 		}
 		if cw != nil {
 			cw.SetEnabledInPlaying(playing)

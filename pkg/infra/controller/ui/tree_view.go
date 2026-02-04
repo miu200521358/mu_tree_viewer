@@ -107,6 +107,16 @@ func (tw *TreeViewWidget) SetEnabled(enabled bool) {
 	tw.treeView.SetEnabled(enabled)
 }
 
+// Focus はツリービューにフォーカスを移す。
+func (tw *TreeViewWidget) Focus() {
+	if tw == nil || tw.treeView == nil {
+		return
+	}
+	if err := tw.treeView.SetFocus(); err != nil && tw.logger != nil {
+		tw.logger.Warn("ツリービューのフォーカス設定に失敗しました: %s", err.Error())
+	}
+}
+
 // SetModelPaths はルートパス一覧からツリーを再構築する。
 func (tw *TreeViewWidget) SetModelPaths(paths []string) error {
 	if tw == nil {
