@@ -181,30 +181,46 @@
     },
     {
         "id": "パスコピー説明",
-        "translation": "Copy the path to clipboard"
+        "translation": "경로를 클립보드에 복사합니다"
+    },
+    {
+        "id": "フルパスコピー",
+        "translation": "전체 경로 복사"
+    },
+    {
+        "id": "送る",
+        "translation": "보내기"
     },
     {
         "id": "読み込み失敗",
-        "translation": "Load failed"
+        "translation": "로드 실패"
     },
     {
         "id": "読み込み終了しました",
-        "translation": "Load completed"
+        "translation": "로드 완료"
     },
     {
         "id": "パスをコピーしました",
-        "translation": "Path copied"
+        "translation": "경로를 복사했습니다"
     },
     {
         "id": "パスコピーに失敗しました",
-        "translation": "Failed to copy path"
+        "translation": "경로 복사에 실패했습니다"
+    },
+    {
+        "id": "送るを呼び出しました",
+        "translation": "보내기를 열었습니다"
+    },
+    {
+        "id": "送るに失敗しました",
+        "translation": "보내기 열기에 실패했습니다"
     },
     {
         "id": "ツリー構築に失敗しました",
-        "translation": "Failed to build tree"
+        "translation": "트리 구성에 실패했습니다"
     },
     {
         "id": "対象モデルが見つかりません",
-        "translation": "No model files found"
+        "translation": "모델 파일을 찾지 못했습니다"
     }
 ]

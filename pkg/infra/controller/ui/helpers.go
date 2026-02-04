@@ -5,7 +5,11 @@
 package ui
 
 import (
+	"errors"
+	"syscall"
+
 	"github.com/miu200521358/mlib_go/pkg/shared/base/logging"
+	"github.com/miu200521358/win"
 )
 
 // logInfoLine は情報ログを1行として出力する。
@@ -44,4 +48,23 @@ func logErrorWithTitle(logger logging.ILogger, title string, err error) {
 		return
 	}
 	logger.Error("%s: %s", title, err.Error())
+}
+
+// sendToPath はWindowsの送る機能を呼び出す。
+func sendToPath(path string) error {
+	if path == "" {
+		return errors.New("path is empty")
+	}
+	verb, err := syscall.UTF16PtrFromString("sendto")
+	if err != nil {
+		return err
+	}
+	filePath, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return err
+	}
+	if ok := win.ShellExecute(0, verb, filePath, nil, nil, win.SW_SHOWNORMAL); !ok {
+		return errors.New("sendto failed")
+	}
+	return nil
 }

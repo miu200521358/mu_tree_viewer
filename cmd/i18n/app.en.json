@@ -184,6 +184,14 @@
         "translation": "Copy the path to clipboard"
     },
     {
+        "id": "フルパスコピー",
+        "translation": "Copy Full Path"
+    },
+    {
+        "id": "送る",
+        "translation": "Send To"
+    },
+    {
         "id": "読み込み失敗",
         "translation": "Load failed"
     },
@@ -198,6 +206,14 @@
     {
         "id": "パスコピーに失敗しました",
         "translation": "Failed to copy path"
+    },
+    {
+        "id": "送るを呼び出しました",
+        "translation": "Opened Send To"
+    },
+    {
+        "id": "送るに失敗しました",
+        "translation": "Failed to open Send To"
     },
     {
         "id": "ツリー構築に失敗しました",

@@ -223,6 +223,18 @@ func (s *treeViewerState) handleCopyPath(path string) {
 	logInfoLine(s.logger, i18n.TranslateOrMark(s.translator, messages.LogCopySuccess))
 }
 
+// handleSendToPath は送る操作を処理する。
+func (s *treeViewerState) handleSendToPath(path string) {
+	if s == nil || path == "" {
+		return
+	}
+	if err := sendToPath(path); err != nil {
+		logErrorWithTitle(s.logger, i18n.TranslateOrMark(s.translator, messages.LogSendToFailure), err)
+		return
+	}
+	logInfoLine(s.logger, i18n.TranslateOrMark(s.translator, messages.LogSendToSuccess))
+}
+
 // updatePlayerStateWithFrame は再生UIを反映する。
 func (s *treeViewerState) updatePlayerStateWithFrame(motionData *motion.VmdMotion, maxFrame motion.Frame) {
 	if s == nil || s.player == nil {

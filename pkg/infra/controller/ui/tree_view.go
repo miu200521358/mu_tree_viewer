@@ -18,21 +18,22 @@ import (
 type TreeViewWidget struct {
 	container      *walk.Composite
 	treeView       *walk.TreeView
-	copyButton     *walk.PushButton
-	copyIcon       *walk.Bitmap
 	model          *TreeModel
 	translator     i18n.II18n
 	logger         logging.ILogger
 	minSize        declarative.Size
 	maxSize        declarative.Size
 	stretchFactor  int
-	hoverPath      string
+	contextPath    string
+	contextCopy    *walk.Action
+	contextSendTo  *walk.Action
 	onFileSelected func(string)
 	onCopyPath     func(string)
+	onSendToPath   func(string)
 }
 
 // NewTreeViewWidget はTreeViewWidgetを生成する。
-func NewTreeViewWidget(translator i18n.II18n, logger logging.ILogger, onFileSelected func(string), onCopyPath func(string)) *TreeViewWidget {
+func NewTreeViewWidget(translator i18n.II18n, logger logging.ILogger, onFileSelected func(string), onCopyPath func(string), onSendToPath func(string)) *TreeViewWidget {
 	if logger == nil {
 		logger = logging.DefaultLogger()
 	}
@@ -42,7 +43,7 @@ func NewTreeViewWidget(translator i18n.II18n, logger logging.ILogger, onFileSele
 		model:          NewTreeModel(),
 		onFileSelected: onFileSelected,
 		onCopyPath:     onCopyPath,
-		copyIcon:       loadCopyIcon(logger),
+		onSendToPath:   onSendToPath,
 	}
 }
 
@@ -97,9 +98,6 @@ func (tw *TreeViewWidget) SetEnabled(enabled bool) {
 		return
 	}
 	tw.treeView.SetEnabled(enabled)
-	if !enabled {
-		tw.hideCopyButton()
-	}
 }
 
 // SetModelPaths はルートパス一覧からツリーを再構築する。
@@ -107,7 +105,6 @@ func (tw *TreeViewWidget) SetModelPaths(paths []string) error {
 	if tw == nil {
 		return nil
 	}
-	tw.hideCopyButton()
 	if tw.model == nil {
 		tw.model = NewTreeModel()
 		if tw.treeView != nil {
@@ -182,33 +179,28 @@ func (tw *TreeViewWidget) Widgets() declarative.Composite {
 				},
 				Children: []declarative.Widget{
 					declarative.TreeView{
-						AssignTo:             &tw.treeView,
-						Model:                tw.model,
-						StretchFactor:        1,
-						ToolTipText:          i18n.TranslateOrMark(tw.translator, messages.LabelTreeViewTip),
+						AssignTo:      &tw.treeView,
+						Model:         tw.model,
+						StretchFactor: 1,
+						ToolTipText:   i18n.TranslateOrMark(tw.translator, messages.LabelTreeViewTip),
+						ContextMenuItems: []declarative.MenuItem{
+							declarative.Action{
+								AssignTo:    &tw.contextCopy,
+								Text:        i18n.TranslateOrMark(tw.translator, messages.LabelCopyFullPath),
+								Enabled:     false,
+								OnTriggered: tw.handleContextCopy,
+							},
+							declarative.Action{
+								AssignTo:    &tw.contextSendTo,
+								Text:        i18n.TranslateOrMark(tw.translator, messages.LabelSendTo),
+								Enabled:     false,
+								OnTriggered: tw.handleContextSendTo,
+							},
+						},
 						OnCurrentItemChanged: tw.handleCurrentItemChanged,
-						OnExpandedChanged: func(_ walk.TreeItem) {
-							tw.hideCopyButton()
+						OnMouseDown: func(x, y int, button walk.MouseButton) {
+							tw.handleMouseDown(x, y, button)
 						},
-						OnMouseMove: func(x, y int, _ walk.MouseButton) {
-							tw.handleMouseMove(x, y)
-						},
-						OnMouseDown: func(x, y int, _ walk.MouseButton) {
-							tw.handleMouseMove(x, y)
-						},
-						OnMouseUp: func(x, y int, _ walk.MouseButton) {
-							tw.handleMouseMove(x, y)
-						},
-					},
-					declarative.PushButton{
-						AssignTo:    &tw.copyButton,
-						Text:        "",
-						Image:       tw.copyIcon,
-						MinSize:     declarative.Size{Width: 1, Height: 1},
-						MaxSize:     declarative.Size{Width: 1, Height: 1},
-						Visible:     false,
-						ToolTipText: i18n.TranslateOrMark(tw.translator, messages.LabelPathCopyTip),
-						OnClicked:   tw.handleCopyClicked,
 					},
 				},
 			},
@@ -223,7 +215,6 @@ func (tw *TreeViewWidget) updateLayout() {
 	}
 	bounds := tw.container.ClientBounds()
 	tw.treeView.SetBounds(bounds)
-	tw.hideCopyButton()
 }
 
 // handleCurrentItemChanged は選択変更時の処理を行う。
@@ -241,74 +232,69 @@ func (tw *TreeViewWidget) handleCurrentItemChanged() {
 	}
 }
 
-// handleMouseMove はホバー状態に応じてコピーアイコンを表示する。
-func (tw *TreeViewWidget) handleMouseMove(x, y int) {
-	if tw == nil || tw.treeView == nil || tw.copyButton == nil {
+// handleMouseDown はクリック時の処理を行う。
+func (tw *TreeViewWidget) handleMouseDown(x, y int, button walk.MouseButton) {
+	if tw == nil {
+		return
+	}
+	if button != walk.RightButton {
+		return
+	}
+	tw.prepareContextMenu(x, y)
+}
+
+// prepareContextMenu は右クリック時のコンテキストメニュー状態を更新する。
+func (tw *TreeViewWidget) prepareContextMenu(x, y int) {
+	if tw == nil || tw.treeView == nil {
 		return
 	}
 	item := tw.treeView.ItemAt(x, y)
 	node, ok := item.(*TreeNode)
 	if !ok || node == nil || node.IsDir() {
-		tw.hideCopyButton()
+		tw.updateContextMenu("")
 		return
 	}
-	path := node.Path()
-	if path == "" {
-		tw.hideCopyButton()
-		return
-	}
-	tw.hoverPath = path
-	tw.updateCopyButtonBounds(x, y)
+	// 右クリック時はモデル読み込みを避けるため選択変更は行わない。
+	tw.updateContextMenu(node.Path())
 }
 
-// updateCopyButtonBounds はコピーアイコンの位置を更新する。
-func (tw *TreeViewWidget) updateCopyButtonBounds(mouseX, mouseY int) {
-	if tw == nil || tw.treeView == nil || tw.copyButton == nil {
-		return
-	}
-	bounds := tw.treeView.ClientBounds()
-	if bounds.Width == 0 || bounds.Height == 0 {
-		return
-	}
-	iconSize := tw.treeView.IntFrom96DPI(16)
-	margin := tw.treeView.IntFrom96DPI(4)
-	itemHeight := tw.treeView.ItemHeight()
-	if itemHeight <= 0 {
-		itemHeight = tw.treeView.IntFrom96DPI(20)
-	}
-	rowTop := 0
-	if itemHeight > 0 {
-		rowTop = (mouseY / itemHeight) * itemHeight
-	}
-	x := bounds.Width - iconSize - margin
-	y := rowTop + (itemHeight-iconSize)/2
-	if x < 0 || y < 0 {
-		tw.hideCopyButton()
-		return
-	}
-	tw.copyButton.SetBounds(walk.Rectangle{X: x, Y: y, Width: iconSize, Height: iconSize})
-	tw.copyButton.SetVisible(true)
-}
-
-// handleCopyClicked はコピーアイコン押下時の処理を行う。
-func (tw *TreeViewWidget) handleCopyClicked() {
+// updateContextMenu はコンテキストメニューの有効状態を更新する。
+func (tw *TreeViewWidget) updateContextMenu(path string) {
 	if tw == nil {
 		return
 	}
-	path := tw.hoverPath
-	if path == "" {
+	tw.contextPath = path
+	enabled := path != ""
+	tw.setActionEnabled(tw.contextCopy, enabled)
+	tw.setActionEnabled(tw.contextSendTo, enabled)
+}
+
+// setActionEnabled はアクションの有効状態を設定する。
+func (tw *TreeViewWidget) setActionEnabled(action *walk.Action, enabled bool) {
+	if action == nil {
 		return
 	}
-	if tw.onCopyPath != nil {
-		tw.onCopyPath(path)
+	if err := action.SetEnabled(enabled); err != nil && tw.logger != nil {
+		tw.logger.Warn("メニュー状態の更新に失敗しました: %s", err.Error())
 	}
 }
 
-// hideCopyButton はコピーアイコンを非表示にする。
-func (tw *TreeViewWidget) hideCopyButton() {
-	if tw == nil || tw.copyButton == nil {
+// handleContextCopy はコンテキストメニューのパスコピー処理を行う。
+func (tw *TreeViewWidget) handleContextCopy() {
+	if tw == nil || tw.contextPath == "" {
 		return
 	}
-	tw.hoverPath = ""
-	tw.copyButton.SetVisible(false)
+	if tw.onCopyPath != nil {
+		tw.onCopyPath(tw.contextPath)
+	}
+}
+
+// handleContextSendTo はコンテキストメニューの送る処理を行う。
+func (tw *TreeViewWidget) handleContextSendTo() {
+	if tw == nil || tw.contextPath == "" {
+		return
+	}
+	if tw.onSendToPath != nil {
+		tw.onSendToPath(tw.contextPath)
+	}
 }
