@@ -16,7 +16,7 @@ import (
 	"github.com/miu200521358/mlib_go/pkg/domain/motion"
 	"github.com/miu200521358/mlib_go/pkg/infra/controller"
 	"github.com/miu200521358/mlib_go/pkg/infra/controller/widget"
-	sharedbase "github.com/miu200521358/mlib_go/pkg/shared/base"
+	"github.com/miu200521358/mlib_go/pkg/shared/base"
 	"github.com/miu200521358/mlib_go/pkg/shared/base/config"
 	"github.com/miu200521358/mlib_go/pkg/shared/base/i18n"
 	"github.com/miu200521358/mlib_go/pkg/shared/base/logging"
@@ -126,7 +126,7 @@ func (s *treeViewerState) handleFolderPathsChanged(cw *controller.ControlWindow,
 	err := error(nil)
 	if targetWindow != nil {
 		// ツリー構築中は再生時と同じ無効化で操作を抑止する。
-		err = sharedbase.RunWithBoolState(targetWindow.SetEnabledInPlaying, true, targetWindow.Playing(), setModelPaths)
+		err = base.RunWithBoolState(targetWindow.SetEnabledInPlaying, true, targetWindow.Playing(), setModelPaths)
 	} else {
 		err = setModelPaths()
 	}
@@ -219,7 +219,7 @@ func (s *treeViewerState) loadModelInternal(path string, logSuccess bool) error 
 		return nil
 	}
 	loadWithTreeViewGuard := func() error {
-		return sharedbase.RunWithSetupTeardown(
+		return base.RunWithSetupTeardown(
 			func() {
 				if s.treeView != nil {
 					s.treeView.SetEnabled(false)
@@ -238,7 +238,7 @@ func (s *treeViewerState) loadModelInternal(path string, logSuccess bool) error 
 		return loadWithTreeViewGuard()
 	}
 	// モデル読み込み中は再生時と同じ無効化で操作を抑止する。
-	return sharedbase.RunWithBoolState(cw.SetEnabledInPlaying, true, cw.Playing(), loadWithTreeViewGuard)
+	return base.RunWithBoolState(cw.SetEnabledInPlaying, true, cw.Playing(), loadWithTreeViewGuard)
 }
 
 // handleCopyPath はパスコピーを処理する。

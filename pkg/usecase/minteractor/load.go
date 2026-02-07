@@ -2,7 +2,7 @@
 package minteractor
 
 import (
-	commonusecase "github.com/miu200521358/mlib_go/pkg/usecase"
+	"github.com/miu200521358/mlib_go/pkg/usecase"
 	"github.com/miu200521358/mu_tree_viewer/pkg/usecase/port/moutput"
 )
 
@@ -12,7 +12,7 @@ func (uc *TreeViewerUsecase) LoadModel(rep moutput.IFileReader, path string) (*M
 	if repo == nil {
 		repo = uc.modelReader
 	}
-	modelData, err := commonusecase.LoadModel(repo, path)
+	modelData, err := usecase.LoadModel(repo, path)
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +25,7 @@ func (uc *TreeViewerUsecase) LoadMotion(rep moutput.IFileReader, path string) (*
 	if repo == nil {
 		repo = uc.motionReader
 	}
-	result, err := commonusecase.LoadMotionWithMeta(repo, path)
+	result, err := usecase.LoadMotionWithMeta(repo, path)
 	if err != nil {
 		return nil, err
 	}
@@ -37,5 +37,5 @@ func (uc *TreeViewerUsecase) LoadMotion(rep moutput.IFileReader, path string) (*
 
 // CanLoadModelPath はモデルの読み込み可否を判定する。
 func (uc *TreeViewerUsecase) CanLoadModelPath(path string) bool {
-	return commonusecase.CanLoadPath(uc.modelReader, path)
+	return usecase.CanLoadPath(uc.modelReader, path)
 }
