@@ -16,6 +16,7 @@ import (
 	"github.com/miu200521358/mlib_go/pkg/domain/motion"
 	"github.com/miu200521358/mlib_go/pkg/infra/controller"
 	"github.com/miu200521358/mlib_go/pkg/infra/controller/widget"
+	sharedbase "github.com/miu200521358/mlib_go/pkg/shared/base"
 	"github.com/miu200521358/mlib_go/pkg/shared/base/config"
 	"github.com/miu200521358/mlib_go/pkg/shared/base/i18n"
 	"github.com/miu200521358/mlib_go/pkg/shared/base/logging"
@@ -119,13 +120,16 @@ func (s *treeViewerState) handleFolderPathsChanged(cw *controller.ControlWindow,
 	if targetWindow == nil {
 		targetWindow = s.controlWindow()
 	}
+	setModelPaths := func() error {
+		return s.treeView.SetModelPaths(paths)
+	}
+	err := error(nil)
 	if targetWindow != nil {
 		// ツリー構築中は再生時と同じ無効化で操作を抑止する。
-		playing := targetWindow.Playing()
-		targetWindow.SetEnabledInPlaying(true)
-		defer targetWindow.SetEnabledInPlaying(playing)
+		err = sharedbase.RunWithBoolState(targetWindow.SetEnabledInPlaying, true, targetWindow.Playing(), setModelPaths)
+	} else {
+		err = setModelPaths()
 	}
-	err := s.treeView.SetModelPaths(paths)
 	if err != nil {
 		logErrorWithTitle(s.logger, i18n.TranslateOrMark(s.translator, messages.LogTreeBuildFailure), err)
 	}
@@ -193,43 +197,48 @@ func (s *treeViewerState) loadModelInternal(path string, logSuccess bool) error 
 		return fmt.Errorf("モデルパスが空です")
 	}
 	cw := s.controlWindow()
-	playing := false
-	if cw != nil {
-		playing = cw.Playing()
-		// モデル読み込み中は再生時と同じ無効化で操作を抑止する。
-		cw.SetEnabledInPlaying(true)
-	}
-	if s.treeView != nil {
-		s.treeView.SetEnabled(false)
-	}
-	defer func() {
-		if s.treeView != nil {
-			s.treeView.SetEnabled(true)
-			s.treeView.Focus()
+	load := func() error {
+		if s.usecase == nil {
+			return fmt.Errorf("モデル読み込み用のユースケースが未設定です")
 		}
+		result, err := s.usecase.LoadModel(nil, path)
+		if err != nil {
+			return err
+		}
+		modelData := (*model.PmxModel)(nil)
+		if result != nil {
+			modelData = result.Model
+		}
+		s.modelData = modelData
 		if cw != nil {
-			cw.SetEnabledInPlaying(playing)
+			cw.SetModel(treeViewerWindowIndex, treeViewerModelIndex, modelData)
 		}
-	}()
-	if s.usecase == nil {
-		return fmt.Errorf("モデル読み込み用のユースケースが未設定です")
+		if logSuccess && modelData != nil {
+			logInfoLine(s.logger, i18n.TranslateOrMark(s.translator, messages.LogLoadSuccess))
+		}
+		return nil
 	}
-	result, err := s.usecase.LoadModel(nil, path)
-	if err != nil {
-		return err
+	loadWithTreeViewGuard := func() error {
+		return sharedbase.RunWithSetupTeardown(
+			func() {
+				if s.treeView != nil {
+					s.treeView.SetEnabled(false)
+				}
+			},
+			func() {
+				if s.treeView != nil {
+					s.treeView.SetEnabled(true)
+					s.treeView.Focus()
+				}
+			},
+			load,
+		)
 	}
-	modelData := (*model.PmxModel)(nil)
-	if result != nil {
-		modelData = result.Model
+	if cw == nil {
+		return loadWithTreeViewGuard()
 	}
-	s.modelData = modelData
-	if cw != nil {
-		cw.SetModel(treeViewerWindowIndex, treeViewerModelIndex, modelData)
-	}
-	if logSuccess && modelData != nil {
-		logInfoLine(s.logger, i18n.TranslateOrMark(s.translator, messages.LogLoadSuccess))
-	}
-	return nil
+	// モデル読み込み中は再生時と同じ無効化で操作を抑止する。
+	return sharedbase.RunWithBoolState(cw.SetEnabledInPlaying, true, cw.Playing(), loadWithTreeViewGuard)
 }
 
 // handleCopyPath はパスコピーを処理する。
